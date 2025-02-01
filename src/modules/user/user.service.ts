@@ -54,4 +54,17 @@ export class UserService {
     };
   }
 
+  async getAllUsers() {
+    try {
+      const users = await this.userModel.find(); 
+      return {
+        success: true,
+        message: 'Users retrieved successfully',
+        data: users,
+      };
+    } catch (error) {
+      throw new Error('Error fetching users');
+    }
+  }
+
 }

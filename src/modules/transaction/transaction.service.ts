@@ -67,7 +67,20 @@ export class TransactionService {
   }
   
 
- 
+  async getAllTransactions() {
+    const transactions = await this.transactionModel.find();
+  
+    if (!transactions.length) {
+      throw new NotFoundException('No transactions found');
+    }
+  
+    return {
+      success: true,
+      message: 'All transactions retrieved successfully',
+      data: transactions,
+    };
+  }
+  
 
 
   

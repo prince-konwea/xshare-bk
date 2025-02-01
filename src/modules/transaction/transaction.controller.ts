@@ -50,4 +50,9 @@ export class TransactionController {
   async approveTransaction(@Param('id') transactionId: string) {
     return this.transactionService.approveTransaction(transactionId);
   }
+
+  @Get()
+  async getAllTransactions() {
+    return this.transactionService.getAllTransactions();
+  }
 }
