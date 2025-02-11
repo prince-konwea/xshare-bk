@@ -55,4 +55,8 @@ export class TransactionController {
   async getAllTransactions() {
     return this.transactionService.getAllTransactions();
   }
+  @Patch(':id/cancel')
+  async cancelTransaction(@Param('id') transactionId: string) {
+    return this.transactionService.cancelTransaction(transactionId);
+  }
 }

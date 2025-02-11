@@ -67,4 +67,44 @@ export class UserService {
     }
   }
 
+
+  async updateUser(userId: string, updateData: Partial<CreateUserDto>) {
+    if (updateData.email || updateData.username) {
+      const existingUser = await this.userModel.findOne({
+        $or: [{ email: updateData.email }, { username: updateData.username }],
+        _id: { $ne: userId }, // Exclude current user from search
+      });
+  
+      if (existingUser) {
+        throw new ConflictException('Email or username already taken');
+      }
+    }
+  
+    const updatedUser = await this.userModel.findByIdAndUpdate(userId, updateData, { new: true });
+  
+    if (!updatedUser) {
+      throw new UnauthorizedException('User not found');
+    }
+  
+    return {
+      success: true,
+      message: 'User updated successfully',
+      data: updatedUser,
+    };
+  }
+  
+
+  async deleteUser(userId: string) {
+    const deletedUser = await this.userModel.findByIdAndDelete(userId);
+  
+    if (!deletedUser) {
+      throw new UnauthorizedException('User not found');
+    }
+  
+    return {
+      success: true,
+      message: 'User deleted successfully',
+    };
+  }
+  
 }

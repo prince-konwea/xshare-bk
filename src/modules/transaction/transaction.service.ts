@@ -188,4 +188,27 @@ export class TransactionService {
       }
     };
   }
+
+
+  async cancelTransaction(transactionId: string) {
+    const transaction = await this.transactionModel.findById(transactionId);
+    
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+  
+    if (transaction.status !== TransactionStatus.PENDING) {
+      throw new BadRequestException('Only pending transactions can be cancelled');
+    }
+  
+    transaction.status = TransactionStatus.REJECTED;
+    await transaction.save();
+  
+    return {
+      success: true,
+      message: 'Transaction cancelled successfully',
+      data: transaction,
+    };
+  }
+  
 }
