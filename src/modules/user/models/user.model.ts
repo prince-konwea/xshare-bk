@@ -27,6 +27,8 @@ export class User {
   balance: number;
   @Prop({ type: Number, default: 0.0 }) 
   profitBalance: number;
+  @Prop({ type: Number, default: 500 }) 
+  bonus: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
