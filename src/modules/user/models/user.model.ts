@@ -20,15 +20,17 @@ export class User {
   @Prop({ required: true, unique: true })
   username: string;
 
-  @Prop({ required: true, trim: true,  })
+  @Prop({ required: true, trim: true })
   password: string;
 
-  @Prop({ type: Number, default: 0.0 }) 
+  @Prop({ type: Number, default: 0.0 })
   balance: number;
-  @Prop({ type: Number, default: 0.0 }) 
+  @Prop({ type: Number, default: 0.0 })
   profitBalance: number;
-  @Prop({ type: Number, default: 500 }) 
+  @Prop({ type: Number, default: 500 })
   bonus: number;
+  @Prop({ type: Number })
+  pin: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
