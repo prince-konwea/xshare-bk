@@ -32,18 +32,4 @@ export class ProductsController {
   async remove(@Param('id') id: string) {
     await this.productsService.remove(id);
   }
-}
-
-// Optional: Image deletion endpoint
-import { v2 as cloudinary } from 'cloudinary';
-import { BadRequestException } from '@nestjs/common';
-
-@Controller('images')
-export class ImagesController {
-  constructor(private readonly productsService: ProductsService) {}
-
-  @Delete(':publicId')
-  async deleteImage(@Param('publicId') publicId: string) {
-    return this.productsService.deleteImage(publicId);
-  }
 } 

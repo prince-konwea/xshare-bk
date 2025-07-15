@@ -3,7 +3,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { UserModule } from './modules/user/user.module';
 import { TransactionModule } from './modules/transaction/transaction.module';
 import { ConfigModule } from '@nestjs/config';
-import { ImagesModule } from './modules/images/images.module';
 import { ProductsModule } from './modules/products/products.module';
 
 console.log(process.env.MONGO_URI)
@@ -14,12 +13,9 @@ console.log(process.env.MONGO_URI)
     }),
     MongooseModule.forRoot(process.env.MONGO_URI), 
    
-    UserModule, TransactionModule, ImagesModule, ProductsModule,
+    UserModule, TransactionModule, ProductsModule,
   ],
   providers: [],
   controllers: [],
-
-
 })
-
 export class AppModule {}
