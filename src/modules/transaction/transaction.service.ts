@@ -190,10 +190,19 @@ export class TransactionService {
     if (transaction.type === TransactionType.DEPOSIT) {
       user.balance += transaction.amount;
     } else if (transaction.type === TransactionType.WITHDRAWAL) {
-      if (user.balance < transaction.amount) {
+      const totalAvailable = user.balance + user.profitBalance;
+      if (totalAvailable < transaction.amount) {
         throw new BadRequestException('Insufficient balance to process withdrawal');
       }
-      user.balance -= transaction.amount;
+      let remainingAmount = transaction.amount;
+      if (user.balance >= remainingAmount) {
+        user.balance -= remainingAmount;
+        remainingAmount = 0;
+      } else {
+        remainingAmount -= user.balance;
+        user.balance = 0;
+        user.profitBalance -= remainingAmount;
+      }
     }
  
     transaction.status = TransactionStatus.APPROVED;
