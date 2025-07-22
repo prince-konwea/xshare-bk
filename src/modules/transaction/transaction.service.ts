@@ -90,30 +90,18 @@ export class TransactionService {
     }
   
     const totalAvailable = user.balance + user.profitBalance;
-  
+
     // Validate withdrawal amount
     if (withdrawDto.amount < 100) {
       throw new BadRequestException('Minimum withdrawal amount is $100');
     }
-  
+
     if (withdrawDto.amount > totalAvailable) {
       throw new BadRequestException('Insufficient funds for withdrawal');
     }
-  
-    // Deduct from balances
-    let remainingAmount = withdrawDto.amount;
-    let updatedBalance = user.balance;
-    let updatedProfitBalance = user.profitBalance;
-  
-    if (updatedBalance >= remainingAmount) {
-      updatedBalance -= remainingAmount;
-      remainingAmount = 0;
-    } else {
-      remainingAmount -= updatedBalance;
-      updatedBalance = 0;
-      updatedProfitBalance -= remainingAmount;
-    }
-  
+
+    // Do NOT deduct from balances here. Only validate.
+
     // Validate method-specific fields
     const { withdrawMethod } = withdrawDto;
     switch (withdrawMethod) {
@@ -137,12 +125,10 @@ export class TransactionService {
       default:
         throw new BadRequestException('Invalid withdrawal method');
     }
-  
-    // Save new balances
-    user.balance = updatedBalance;
-    user.profitBalance = updatedProfitBalance;
-    await user.save();
-  
+
+    // Do NOT update balances here
+    // await user.save();
+
     // Create withdrawal transaction
     const withdrawalData = {
       userId: user._id,
@@ -157,10 +143,10 @@ export class TransactionService {
         ...(withdrawDto.paypalEmail && { paypalEmail: withdrawDto.paypalEmail }),
       },
     };
-  
+
     const transaction = new this.transactionModel(withdrawalData);
     await transaction.save();
-  
+
     return {
       success: true,
       message: 'Withdrawal request submitted for processing',
