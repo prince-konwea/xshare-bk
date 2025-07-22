@@ -83,23 +83,37 @@ export class TransactionService {
   
 
 
-  
-
   async createWithdraw(withdrawDto: WithdrawDto, userId: string) {
     const user = await this.userModel.findById(userId);
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
+  
+    const totalAvailable = user.balance + user.profitBalance;
+  
     // Validate withdrawal amount
     if (withdrawDto.amount < 100) {
       throw new BadRequestException('Minimum withdrawal amount is $100');
     }
-
-    if (user.balance < withdrawDto.amount) {
-      throw new BadRequestException('Insufficient balance for withdrawal');
+  
+    if (withdrawDto.amount > totalAvailable) {
+      throw new BadRequestException('Insufficient funds for withdrawal');
     }
-
+  
+    // Deduct from balances
+    let remainingAmount = withdrawDto.amount;
+    let updatedBalance = user.balance;
+    let updatedProfitBalance = user.profitBalance;
+  
+    if (updatedBalance >= remainingAmount) {
+      updatedBalance -= remainingAmount;
+      remainingAmount = 0;
+    } else {
+      remainingAmount -= updatedBalance;
+      updatedBalance = 0;
+      updatedProfitBalance -= remainingAmount;
+    }
+  
     // Validate method-specific fields
     const { withdrawMethod } = withdrawDto;
     switch (withdrawMethod) {
@@ -123,7 +137,12 @@ export class TransactionService {
       default:
         throw new BadRequestException('Invalid withdrawal method');
     }
-
+  
+    // Save new balances
+    user.balance = updatedBalance;
+    user.profitBalance = updatedProfitBalance;
+    await user.save();
+  
     // Create withdrawal transaction
     const withdrawalData = {
       userId: user._id,
@@ -136,19 +155,21 @@ export class TransactionService {
         ...(withdrawDto.bankRouting && { bankRouting: withdrawDto.bankRouting }),
         ...(withdrawDto.bankAccount && { bankAccount: withdrawDto.bankAccount }),
         ...(withdrawDto.paypalEmail && { paypalEmail: withdrawDto.paypalEmail }),
-      }
+      },
     };
-
+  
     const transaction = new this.transactionModel(withdrawalData);
     await transaction.save();
-
+  
     return {
       success: true,
       message: 'Withdrawal request submitted for processing',
-      data: transaction
+      data: transaction,
     };
   }
+  
 
+  
   // Updated approveTransaction to handle withdrawals
   async approveTransaction(transactionId: string) {
     const transaction = await this.transactionModel.findById(transactionId);
