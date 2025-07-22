@@ -84,126 +84,143 @@ export class TransactionService {
 
 
   async createWithdraw(withdrawDto: WithdrawDto, userId: string) {
-    const user = await this.userModel.findById(userId);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-  
-    const totalAvailable = user.balance + user.profitBalance;
-
-    // Validate withdrawal amount
-    if (withdrawDto.amount < 100) {
-      throw new BadRequestException('Minimum withdrawal amount is $100');
-    }
-
-    if (withdrawDto.amount > totalAvailable) {
-      throw new BadRequestException('Insufficient funds for withdrawal');
-    }
-
-    // Do NOT deduct from balances here. Only validate.
-
-    // Validate method-specific fields
-    const { withdrawMethod } = withdrawDto;
-    switch (withdrawMethod) {
-      case 'Bank Transfer':
-        if (!withdrawDto.bankRouting || !withdrawDto.bankAccount) {
-          throw new BadRequestException('Bank routing and account numbers are required');
-        }
-        break;
-      case 'PayPal':
-        if (!withdrawDto.paypalEmail) {
-          throw new BadRequestException('PayPal email is required');
-        }
-        break;
-      case 'BTC':
-      case 'ETH':
-      case 'USDT':
-        if (!withdrawDto.walletAddress) {
-          throw new BadRequestException('Wallet address is required');
-        }
-        break;
-      default:
-        throw new BadRequestException('Invalid withdrawal method');
-    }
-
-    // Do NOT update balances here
-    // await user.save();
-
-    // Create withdrawal transaction
-    const withdrawalData = {
-      userId: user._id,
-      amount: withdrawDto.amount,
-      type: TransactionType.WITHDRAWAL,
-      status: TransactionStatus.PENDING,
-      method: withdrawDto.withdrawMethod,
-      details: {
-        ...(withdrawDto.walletAddress && { walletAddress: withdrawDto.walletAddress }),
-        ...(withdrawDto.bankRouting && { bankRouting: withdrawDto.bankRouting }),
-        ...(withdrawDto.bankAccount && { bankAccount: withdrawDto.bankAccount }),
-        ...(withdrawDto.paypalEmail && { paypalEmail: withdrawDto.paypalEmail }),
-      },
-    };
-
-    const transaction = new this.transactionModel(withdrawalData);
-    await transaction.save();
-
-    return {
-      success: true,
-      message: 'Withdrawal request submitted for processing',
-      data: transaction,
-    };
+  const user = await this.userModel.findById(userId);
+  if (!user) {
+    throw new NotFoundException('User not found');
   }
-  
+
+  const totalAvailable = user.balance + user.profitBalance;
+
+  // Validate withdrawal amount
+  if (withdrawDto.amount < 100) {
+    throw new BadRequestException('Minimum withdrawal amount is $100');
+  }
+
+  if (withdrawDto.amount > totalAvailable) {
+    throw new BadRequestException('Insufficient funds for withdrawal');
+  }
+
+  // Deduct from balances
+  let remainingAmount = withdrawDto.amount;
+  let updatedBalance = user.balance;
+  let updatedProfitBalance = user.profitBalance;
+
+  if (updatedBalance >= remainingAmount) {
+    updatedBalance -= remainingAmount;
+    remainingAmount = 0;
+  } else {
+    remainingAmount -= updatedBalance;
+    updatedBalance = 0;
+    updatedProfitBalance -= remainingAmount;
+  }
+
+  // Validate method-specific fields
+  const { withdrawMethod } = withdrawDto;
+  switch (withdrawMethod) {
+    case 'Bank Transfer':
+      if (!withdrawDto.bankRouting || !withdrawDto.bankAccount) {
+        throw new BadRequestException('Bank routing and account numbers are required');
+      }
+      break;
+    case 'PayPal':
+      if (!withdrawDto.paypalEmail) {
+        throw new BadRequestException('PayPal email is required');
+      }
+      break;
+    case 'BTC':
+    case 'ETH':
+    case 'USDT':
+      if (!withdrawDto.walletAddress) {
+        throw new BadRequestException('Wallet address is required');
+      }
+      break;
+    default:
+      throw new BadRequestException('Invalid withdrawal method');
+  }
+
+  // Save new balances
+  user.balance = updatedBalance;
+  user.profitBalance = updatedProfitBalance;
+  await user.save();
+
+  // Create withdrawal transaction
+  const withdrawalData = {
+    userId: user._id,
+    amount: withdrawDto.amount,
+    type: TransactionType.WITHDRAWAL,
+    status: TransactionStatus.PENDING,
+    method: withdrawDto.withdrawMethod,
+    details: {
+      ...(withdrawDto.walletAddress && { walletAddress: withdrawDto.walletAddress }),
+      ...(withdrawDto.bankRouting && { bankRouting: withdrawDto.bankRouting }),
+      ...(withdrawDto.bankAccount && { bankAccount: withdrawDto.bankAccount }),
+      ...(withdrawDto.paypalEmail && { paypalEmail: withdrawDto.paypalEmail }),
+    },
+  };
+
+  const transaction = new this.transactionModel(withdrawalData);
+  await transaction.save();
+
+  return {
+    success: true,
+    message: 'Withdrawal request submitted for processing',
+    data: transaction,
+  };
+}
+
 
   
   // Updated approveTransaction to handle withdrawals
-  async approveTransaction(transactionId: string) {
-    const transaction = await this.transactionModel.findById(transactionId);
-    if (!transaction) {
-      throw new NotFoundException('Transaction not found');
-    }
-
-    if (transaction.status !== TransactionStatus.PENDING) {
-      throw new BadRequestException('Only pending transactions can be approved');
-    }
-
-    const user = await this.userModel.findById(transaction.userId);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    // Handle balance update based on transaction type
-    if (transaction.type === TransactionType.DEPOSIT) {
-      user.balance += transaction.amount;
-    } else if (transaction.type === TransactionType.WITHDRAWAL) {
-      const totalAvailable = user.balance + user.profitBalance;
-      if (totalAvailable < transaction.amount) {
-        throw new BadRequestException('Insufficient balance to process withdrawal');
-      }
-      let remainingAmount = transaction.amount;
-      if (user.balance >= remainingAmount) {
-        user.balance -= remainingAmount;
-        remainingAmount = 0;
-      } else {
-        remainingAmount -= user.balance;
-        user.balance = 0;
-        user.profitBalance -= remainingAmount;
-      }
-    }
- 
-    transaction.status = TransactionStatus.APPROVED;
-    await transaction.save();
-    await user.save();
-
-    return {
-      success: true,
-      message: `Withdrawal processed successfully. New balance: $${user.balance}`,
-      data: {
-        transaction,
-        updatedBalance: user.balance
-      }
-    };
+async approveTransaction(transactionId: string) {
+  const transaction = await this.transactionModel.findById(transactionId);
+  if (!transaction) {
+    throw new NotFoundException('Transaction not found');
   }
+
+  if (transaction.status !== TransactionStatus.PENDING) {
+    throw new BadRequestException('Only pending transactions can be approved');
+  }
+
+  const user = await this.userModel.findById(transaction.userId);
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  // Handle balance update based on transaction type
+  if (transaction.type === TransactionType.DEPOSIT) {
+    user.balance += transaction.amount;
+  } 
+  // No deduction needed for withdrawal since already handled during createWithdraw
+  // But optionally, verify that user still has enough balance to have covered it
+  else if (transaction.type === TransactionType.WITHDRAWAL) {
+    const totalBefore = user.balance + user.profitBalance;
+    const totalAfter = totalBefore + transaction.amount;
+
+    if (totalAfter < 0) {
+      throw new BadRequestException('Inconsistent state: negative total balance after withdrawal');
+    }
+
+    // Optional: Log if current total is unexpectedly high (means balance wasn't deducted earlier)
+    const expectedTotal = user.balance + user.profitBalance + transaction.amount;
+    if (expectedTotal === totalAfter) {
+      console.warn(`Warning: Withdrawal might not have been deducted at creation. Consider adjusting balance now.`);
+    }
+  }
+
+  transaction.status = TransactionStatus.APPROVED;
+  await transaction.save();
+  await user.save();
+
+  return {
+    success: true,
+    message: `Transaction approved successfully.`,
+    data: {
+      transaction,
+      updatedBalance: user.balance,
+      updatedProfitBalance: user.profitBalance,
+    }
+  };
+}
 
 
   async cancelTransaction(transactionId: string) {
