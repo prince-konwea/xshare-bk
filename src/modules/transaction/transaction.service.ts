@@ -89,7 +89,10 @@ export class TransactionService {
     throw new NotFoundException('User not found');
   }
 
-  const totalAvailable = user.balance + user.profitBalance;
+  // Ensure balances are numbers
+  const balance = Number(user.balance) || 0;
+  const profitBalance = Number(user.profitBalance) || 0;
+  const totalAvailable = balance + profitBalance;
 
   // Validate withdrawal amount
   if (withdrawDto.amount < 100) {
@@ -100,19 +103,7 @@ export class TransactionService {
     throw new BadRequestException('Insufficient funds for withdrawal');
   }
 
-  // Deduct from balances
-  let remainingAmount = withdrawDto.amount;
-  let updatedBalance = user.balance;
-  let updatedProfitBalance = user.profitBalance;
-
-  if (updatedBalance >= remainingAmount) {
-    updatedBalance -= remainingAmount;
-    remainingAmount = 0;
-  } else {
-    remainingAmount -= updatedBalance;
-    updatedBalance = 0;
-    updatedProfitBalance -= remainingAmount;
-  }
+  // Remove deduction logic from createWithdraw. Only validate funds and method fields
 
   // Validate method-specific fields
   const { withdrawMethod } = withdrawDto;
@@ -137,11 +128,6 @@ export class TransactionService {
     default:
       throw new BadRequestException('Invalid withdrawal method');
   }
-
-  // Save new balances
-  user.balance = updatedBalance;
-  user.profitBalance = updatedProfitBalance;
-  await user.save();
 
   // Create withdrawal transaction
   const withdrawalData = {
