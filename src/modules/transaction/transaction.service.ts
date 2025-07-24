@@ -175,21 +175,21 @@ async approveTransaction(transactionId: string) {
   // Handle balance update based on transaction type
   if (transaction.type === TransactionType.DEPOSIT) {
     user.balance += transaction.amount;
-  } 
-  // No deduction needed for withdrawal since already handled during createWithdraw
-  // But optionally, verify that user still has enough balance to have covered it
-  else if (transaction.type === TransactionType.WITHDRAWAL) {
-    const totalBefore = user.balance + user.profitBalance;
-    const totalAfter = totalBefore + transaction.amount;
-
-    if (totalAfter < 0) {
-      throw new BadRequestException('Inconsistent state: negative total balance after withdrawal');
+  } else if (transaction.type === TransactionType.WITHDRAWAL) {
+    // Deduct from balance and profitBalance only on approval
+    const balance = Number(user.balance) || 0;
+    const profitBalance = Number(user.profitBalance) || 0;
+    const totalAvailable = balance + profitBalance;
+    if (totalAvailable < transaction.amount) {
+      throw new BadRequestException('Insufficient balance to process withdrawal');
     }
-
-    // Optional: Log if current total is unexpectedly high (means balance wasn't deducted earlier)
-    const expectedTotal = user.balance + user.profitBalance + transaction.amount;
-    if (expectedTotal === totalAfter) {
-      console.warn(`Warning: Withdrawal might not have been deducted at creation. Consider adjusting balance now.`);
+    let remainingAmount = transaction.amount;
+    if (balance >= remainingAmount) {
+      user.balance = balance - remainingAmount;
+      // profitBalance unchanged
+    } else {
+      user.balance = 0;
+      user.profitBalance = profitBalance - (remainingAmount - balance);
     }
   }
 
